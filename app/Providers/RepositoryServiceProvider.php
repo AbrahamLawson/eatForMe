@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\CQRS\CommandHandlers\CreateProfileCommandHandler;
 use App\CQRS\QueryHandlers\GetProfileByUserIdQueryHandler;
 use App\Repositories\Interfaces\AvailabilityRepositoryInterface;
+use App\Repositories\Interfaces\MatchFeedbackRepositoryInterface;
 use App\Repositories\Interfaces\MessageRepositoryInterface;
 use App\Repositories\Interfaces\ProfileRepositoryInterface;
 use App\Repositories\Interfaces\RatingRepositoryInterface;
@@ -14,6 +15,7 @@ use App\Repositories\Interfaces\RestaurantRepositoryInterface;
 use App\Repositories\Interfaces\UserMatchRepositoryInterface;
 use App\Repositories\Interfaces\UserRepositoryInterface;
 use App\Models\Availability;
+use App\Models\MatchFeedback;
 use App\Models\Message;
 use App\Models\Profile;
 use App\Models\Rating;
@@ -21,6 +23,7 @@ use App\Models\Restaurant;
 use App\Models\User;
 use App\Models\UserMatch;
 use App\Repositories\AvailabilityRepository;
+use App\Repositories\MatchFeedbackRepository;
 use App\Repositories\MessageRepository;
 use App\Repositories\ProfileRepository;
 use App\Repositories\RatingRepository;
@@ -85,6 +88,10 @@ class RepositoryServiceProvider extends ServiceProvider
             );
         });
 
+                $this->app->bind(MatchFeedbackRepositoryInterface::class, function ($app) {
+            return new MatchFeedbackRepository($app->make(MatchFeedback::class));
+        });
+
         // Services
         $this->app->bind(ProfileService::class, function ($app) {
             return new ProfileService(
@@ -99,7 +106,8 @@ class RepositoryServiceProvider extends ServiceProvider
             return new MatchingService(
                 $app->make(AvailabilityRepositoryInterface::class),
                 $app->make(UserRepositoryInterface::class),
-                $app->make(UserMatchRepositoryInterface::class)
+                $app->make(UserMatchRepositoryInterface::class),
+                $app->make('App\Services\MachineLearningService')
             );
         });
         

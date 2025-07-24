@@ -57,4 +57,13 @@ interface UserMatchRepositoryInterface extends RepositoryInterface
      * @return EloquentCollection
      */
     public function findByStatus(string $status): EloquentCollection;
+    
+    /**
+     * Met à jour le score de compatibilité d'un match.
+     *
+     * @param int $matchId ID du match
+     * @param float $score Score de compatibilité (0-100)
+     * @return bool Succès de la mise à jour
+     */
+    public function updateCompatibilityScore(int $matchId, float $score): bool;
 }

@@ -24,6 +24,11 @@ final class ShowActiveSearchController
         // Récupérer les préférences de l'utilisateur depuis l'attribut preferences
         $userPreferences = $user->preferences ?? [];
         
+        // S'assurer que les préférences sont un array (pas une string JSON)
+        if (is_string($userPreferences)) {
+            $userPreferences = json_decode($userPreferences, true) ?? [];
+        }
+        
         return Inertia::render('ActiveSearch/Index', [
             'googleMapsApiKey' => config('services.google.maps.api_key'),
             'userPreferences' => $userPreferences,

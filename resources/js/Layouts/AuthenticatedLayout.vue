@@ -41,8 +41,8 @@ const showingNavigationDropdown = ref(false);
                                 </NavLink>
                                 <!-- Lien vers les disponibilités supprimé -->
                                 <NavLink
-                                    :href="route('active-search')"
-                                    :active="route().current('active-search')"
+                                    :href="route('active-search.index')"
+                                    :active="route().current('active-search.index')"
                                 >
                                     Recherche active
                                 </NavLink>

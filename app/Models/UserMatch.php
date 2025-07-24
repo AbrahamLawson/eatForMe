@@ -30,6 +30,7 @@ class UserMatch extends Model
         'restaurant_address',
         'restaurant_latitude',
         'restaurant_longitude',
+        'compatibility_score',
     ];
     
     /**

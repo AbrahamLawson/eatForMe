@@ -154,4 +154,25 @@ final class EloquentMatchRepository extends AbstractEloquentRepository implement
             ->where('status', $status)
             ->get();
     }
+    
+    /**
+     * Met à jour le score de compatibilité d'un match.
+     *
+     * @param int $matchId ID du match
+     * @param float $score Score de compatibilité (0-100)
+     * @return bool Succès de la mise à jour
+     */
+    public function updateCompatibilityScore(int $matchId, float $score): bool
+    {
+        $match = $this->findById($matchId);
+        
+        if (!$match) {
+            return false;
+        }
+        
+        // Mettre à jour le score de compatibilité
+        return $match->update([
+            'compatibility_score' => $score
+        ]);
+    }
 }

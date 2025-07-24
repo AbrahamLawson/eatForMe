@@ -71,6 +71,7 @@ EatMe est une application qui permet aux utilisateurs de se rencontrer autour d'
 - Tailwind CSS pour le styling
 - Axios pour les requêtes HTTP
 - Leaflet ou Google Maps API pour la carte
+- PHP-ML pour le machine learning et l'amélioration des matchs
 
 ## Fonctionnalités Principales
 - Authentification des utilisateurs
@@ -97,6 +98,9 @@ EatMe est une application qui permet aux utilisateurs de se rencontrer autour d'
 - UX : Interface intuitive, feedback utilisateur, temps de chargement minimisé
 - **Gestion des fichiers** : TOUJOURS vérifier l'existence des fichiers et dossiers dans l'ensemble du projet avant d'en créer de nouveaux pour éviter les duplications et respecter l'architecture existante
 - **Contrôleurs** : Les contrôleurs métier dans ce projet sont des classes autonomes (standalone) qui n'étendent PAS la classe `Controller` de Laravel. Ils doivent être définis comme `final readonly class` pour garantir l'immutabilité et respecter l'architecture CQRS stricte. Exception : les contrôleurs d'authentification (dans le dossier `Auth`) générés par Laravel peuvent conserver leur structure d'origine.
+- **Modifications de schéma de base de données** : TOUJOURS utiliser des migrations Laravel pour toute modification de schéma de base de données (ajout/suppression de tables ou colonnes). NE JAMAIS modifier directement le schéma dans les repositories ou services. Les repositories doivent uniquement interagir avec la base de données existante, pas la modifier structurellement.
+- **Machine Learning** : Utiliser PHP-ML comme bibliothèque officielle pour toutes les fonctionnalités de machine learning. Ne pas implémenter de solutions simplifiées ou simulées, mais toujours utiliser les algorithmes réels de PHP-ML pour permettre des tests concrets et des résultats exploitables en production.
+- **Implémentation directe** : Toujours implémenter des solutions réelles et fonctionnelles plutôt que des simulations ou des commentaires avec des sous-entendus. Chaque fonctionnalité doit être implémentée de manière à pouvoir être testée immédiatement, sans code fictif ou placeholder.
 
 ## Architecture Frontend Vue.js
 

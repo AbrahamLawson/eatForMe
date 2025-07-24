@@ -13,9 +13,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Appeler notre seeder de données de test
+        // Appeler notre seeder de données optimisées pour le matching
         $this->call([
-            TestDataSeeder::class,
+            MatchableUsersSeeder::class,
         ]);
     }
 }
