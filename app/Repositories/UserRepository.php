@@ -7,6 +7,9 @@ namespace App\Repositories;
 use App\Repositories\Interfaces\UserRepositoryInterface;
 use App\Models\User;
 use App\Repositories\Eloquent\EloquentUserRepository;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection as SupportCollection;
 
 final class UserRepository implements UserRepositoryInterface
 {
@@ -31,7 +34,7 @@ final class UserRepository implements UserRepositoryInterface
      * @param array $columns
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getAll(array $columns = ['*'])
+    public function getAll(array $columns = ['*']): Collection
     {
         return $this->eloquentRepository->getAll($columns);
     }
@@ -43,7 +46,7 @@ final class UserRepository implements UserRepositoryInterface
      * @param array $columns
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function getPaginated(int $perPage = 15, array $columns = ['*'])
+    public function getPaginated(int $perPage = 15, array $columns = ['*']): LengthAwarePaginator
     {
         return $this->eloquentRepository->getPaginated($perPage, $columns);
     }
@@ -52,9 +55,9 @@ final class UserRepository implements UserRepositoryInterface
      * Find resource by id
      * 
      * @param int $id
-     * @return mixed
+     * @return User|null
      */
-    public function findById(int $id)
+    public function findById(int $id): ?User
     {
         return $this->eloquentRepository->findById($id);
     }
@@ -63,9 +66,9 @@ final class UserRepository implements UserRepositoryInterface
      * Create new resource
      * 
      * @param array $attributes
-     * @return mixed
+     * @return User
      */
-    public function create(array $attributes)
+    public function create(array $attributes): User
     {
         return $this->eloquentRepository->create($attributes);
     }
@@ -99,7 +102,7 @@ final class UserRepository implements UserRepositoryInterface
      * @param string $email
      * @return User|null
      */
-    public function findByEmail(string $email)
+    public function findByEmail(string $email): ?User
     {
         return $this->eloquentRepository->findByEmail($email);
     }
@@ -112,7 +115,7 @@ final class UserRepository implements UserRepositoryInterface
      * @param float $radius in kilometers
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function findByLocation(float $latitude, float $longitude, float $radius = 10)
+    public function findByLocation(float $latitude, float $longitude, float $radius = 10): Collection
     {
         return $this->eloquentRepository->findByLocation($latitude, $longitude, $radius);
     }
@@ -123,8 +126,20 @@ final class UserRepository implements UserRepositoryInterface
      * @param int $userId
      * @return User
      */
-    public function findUserWithPreferencesAndAvailabilities(int $userId)
+    public function findUserWithPreferencesAndAvailabilities(int $userId): User
     {
         return $this->eloquentRepository->findUserWithPreferencesAndAvailabilities($userId);
+    }
+    
+    /**
+     * Find available users for matching based on filters
+     * 
+     * @param int $userId ID of the user looking for matches
+     * @param array $filters Filters for matching (distance_max, activity_type, etc.)
+     * @return \Illuminate\Support\Collection Collection of available users
+     */
+    public function findAvailableUsers(int $userId, array $filters = []): SupportCollection
+    {
+        return $this->eloquentRepository->findAvailableUsers($userId, $filters);
     }
 }

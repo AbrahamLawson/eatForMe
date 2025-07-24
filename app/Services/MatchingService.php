@@ -19,11 +19,13 @@ final class MatchingService
      * @param AvailabilityRepositoryInterface $availabilityRepository
      * @param UserRepositoryInterface $userRepository
      * @param UserMatchRepositoryInterface $userMatchRepository
+     * @param MachineLearningService $machineLearningService
      */
     public function __construct(
         private AvailabilityRepositoryInterface $availabilityRepository,
         private UserRepositoryInterface $userRepository,
-        private UserMatchRepositoryInterface $userMatchRepository
+        private UserMatchRepositoryInterface $userMatchRepository,
+        private MachineLearningService $machineLearningService
     ) {}
 
     /**
@@ -150,24 +152,118 @@ final class MatchingService
 
     /**
      * Calcule un score de compatibilité entre deux utilisateurs.
+     * Cette méthode utilise soit l'algorithme classique, soit le modèle de machine learning
+     * selon la disponibilité et la qualité du modèle ML.
      *
      * @param array|null $user1Preferences Préférences du premier utilisateur
      * @param array|null $user2Preferences Préférences du deuxième utilisateur
      * @param string|null $activity Activité commune
      * @param float $distance Distance entre les utilisateurs
-     * @return int Score de compatibilité (0-100)
+     * @param bool $returnDetails Si true, retourne les détails du calcul au lieu du score final
+     * @param bool $forceClassicAlgorithm Si true, force l'utilisation de l'algorithme classique
+     * @return array|int Score de compatibilité (0-100) ou détails du calcul
      */
-    public function calculateCompatibilityScore(?array $user1Preferences, ?array $user2Preferences, ?string $activity = null, float $distance = 0, bool $returnDetails = false): array|int
+    public function calculateCompatibilityScore(
+        ?array $user1Preferences, 
+        ?array $user2Preferences, 
+        ?string $activity = null, 
+        float $distance = 0, 
+        bool $returnDetails = false,
+        bool $forceClassicAlgorithm = false
+    ): array|int
     {
-        // Score de base
-        $score = 50;
-
         // Récupérer les préférences des deux utilisateurs
         $user1Prefs = $user1Preferences ?? [];
         $user2Prefs = $user2Preferences ?? [];
         
-        // Préparer un tableau pour stocker les détails du calcul si demandé
+        // Préparer un tableau pour stocker les détails du calcul
         $scoreDetails = [];
+        
+        // Essayer d'utiliser le modèle ML si disponible et non forcé à utiliser l'algorithme classique
+        if (!$forceClassicAlgorithm) {
+            try {
+                // Extraire les caractéristiques pour le modèle ML
+                $features = $this->machineLearningService->extractFeatures(
+                    $user1Prefs,
+                    $user2Prefs,
+                    $activity ?? 'unknown',
+                    $distance
+                );
+                
+                // Prédire le score avec le modèle ML
+                $mlScore = $this->machineLearningService->predictCompatibilityScore($features);
+                
+                // Si le modèle ML a retourné un score valide, l'utiliser
+                if ($mlScore >= 0) {
+                    $scoreDetails['algorithm'] = 'machine_learning';
+                    $scoreDetails['ml_score'] = $mlScore;
+                    $scoreDetails['features'] = $features;
+                    
+                    // Calculer également le score avec l'algorithme classique pour comparaison
+                    $classicScoreDetails = $this->calculateClassicCompatibilityScore(
+                        $user1Prefs, 
+                        $user2Prefs, 
+                        $activity, 
+                        $distance, 
+                        true
+                    );
+                    
+                    $scoreDetails['classic_score'] = $classicScoreDetails['final_score'];
+                    $scoreDetails['classic_details'] = $classicScoreDetails;
+                    
+                    // Score final (limité entre 0 et 100)
+                    $finalScore = max(0, min(100, $mlScore));
+                    $scoreDetails['final_score'] = $finalScore;
+                    
+                    // Retourner soit le score final, soit les détails du calcul
+                    if ($returnDetails) {
+                        return $scoreDetails;
+                    }
+                    
+                    return $finalScore;
+                }
+            } catch (\Exception $e) {
+                // En cas d'erreur, logger et continuer avec l'algorithme classique
+                \Illuminate\Support\Facades\Log::warning('Erreur lors de la prédiction ML, utilisation de l\'algorithme classique', [
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        // Si le modèle ML n'est pas disponible ou a échoué, utiliser l'algorithme classique
+        return $this->calculateClassicCompatibilityScore(
+            $user1Prefs, 
+            $user2Prefs, 
+            $activity, 
+            $distance, 
+            $returnDetails
+        );
+    }
+    
+    /**
+     * Calcule un score de compatibilité entre deux utilisateurs en utilisant l'algorithme classique.
+     *
+     * @param array $user1Prefs Préférences du premier utilisateur
+     * @param array $user2Prefs Préférences du deuxième utilisateur
+     * @param string|null $activity Activité commune
+     * @param float $distance Distance entre les utilisateurs
+     * @param bool $returnDetails Si true, retourne les détails du calcul
+     * @return array|int Score de compatibilité (0-100) ou détails du calcul
+     */
+    private function calculateClassicCompatibilityScore(
+        array $user1Prefs, 
+        array $user2Prefs, 
+        ?string $activity = null, 
+        float $distance = 0, 
+        bool $returnDetails = false
+    ): array|int
+    {
+        // Score de base
+        $score = 50;
+        
+        // Préparer un tableau pour stocker les détails du calcul
+        $scoreDetails = [];
+        $scoreDetails['algorithm'] = 'classic';
 
         // 1. Compatibilité des préférences de rencontre (homme, femme, les deux)
         // Cette partie est cruciale et vaut jusqu'à 30 points

@@ -31,4 +31,13 @@ interface UserRepositoryInterface extends RepositoryInterface
      * @return \App\Models\User
      */
     public function findUserWithPreferencesAndAvailabilities(int $userId);
+    
+    /**
+     * Find available users for matching based on filters
+     * 
+     * @param int $userId ID of the user looking for matches
+     * @param array $filters Filters for matching (distance_max, activity_type, etc.)
+     * @return \Illuminate\Support\Collection Collection of available users
+     */
+    public function findAvailableUsers(int $userId, array $filters = []);
 }

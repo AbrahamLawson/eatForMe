@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 // Contrôleurs de disponibilités supprimés
+use App\Http\Controllers\Match\FindCompatibleUsersController;
 use App\Http\Controllers\Match\ShowActiveSearchController;
-use App\Http\Controllers\Match\PerformActiveSearchController;
+use App\Http\Controllers\Match\TestMatchingController;
+use App\Http\Controllers\Match\UpdateActiveSearchPreferencesController;
 use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Routing\Router;
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -16,22 +20,39 @@ Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+Route::middleware('auth')->group(function (Router $router) {
+    // Groupe de routes pour le profil utilisateur
+    $router->group([
+        'prefix' => '/profile',
+        'as' => 'profile.',
+    ], static function (Router $router): void {
+        $router->get('/', [ProfileController::class, 'edit'])->name('edit');
+        $router->patch('/', [ProfileController::class, 'update'])->name('update');
+        $router->delete('/', [ProfileController::class, 'destroy'])->name('destroy');
+    });
 
-    // Routes pour les disponibilités - supprimées
-    
-    // Routes pour la recherche active
-    Route::get('/active-search', ShowActiveSearchController::class)->name('active-search');
-    Route::post('/active-search/search', PerformActiveSearchController::class)->name('active-search.search');
-    Route::patch('/active-search/preferences', \App\Http\Controllers\Match\UpdateActiveSearchPreferencesController::class)->name('active-search.preferences.update');
-    
-    // Routes pour le test de matching
-    Route::get('/match/test', [\App\Http\Controllers\Match\TestMatchingController::class, 'index'])->name('match.test.index');
-    Route::post('/match/test', [\App\Http\Controllers\Match\TestMatchingController::class, 'testMatching'])->name('match.test');
-    Route::post('/match/test/availability', [\App\Http\Controllers\Match\TestMatchingController::class, 'updateAvailability'])->name('match.test.availability');
+    // Groupe de routes pour la recherche active
+    $router->group([
+        'prefix' => '/active-search',
+        'as' => 'active-search.',
+    ], static function (Router $router): void {
+        $router->get('/', ShowActiveSearchController::class)->name('index');
+        // $router->post('/search', PerformActiveSearchController::class)->name('search'); // Commenté car remplacé par /api/matches/search
+        $router->patch('/preferences', UpdateActiveSearchPreferencesController::class)->name('preferences.update');
+    });
+
+    // Groupe de routes pour le test de matching
+    $router->group([
+        'prefix' => '/match/test',
+        'as' => 'match.test.',
+    ], static function (Router $router): void {
+        $router->get('/', [TestMatchingController::class, 'index'])->name('index');
+        $router->post('/', [TestMatchingController::class, 'testMatching'])->name('run');
+        $router->post('/availability', [TestMatchingController::class, 'updateAvailability'])->name('availability');
+    });
+
+    // Route de recherche de matchs (approche Breeze standard)
+    $router->post('/matches/search', FindCompatibleUsersController::class)->name('matches.search');
 });
 
 require __DIR__.'/auth.php';

@@ -7,14 +7,26 @@
       </div>
     </template>
     
-    <!-- Modal des matchs potentiels -->
-    <MatchModal 
+    <!-- Modal festif des top 2 matchs -->
+    <TopMatchesModal 
       :show="showMatchModal" 
       :matches="potentialMatches" 
-      title="Matchs potentiels pour vous"
+      :total-matches="totalMatchesFound"
+      :all-matches="allMatches"
+      :current-page="currentMatchPage"
       @close="closeMatchModal"
-      @match-accepted="handleMatchAccepted"
-      @match-rejected="handleMatchRejected"
+      @match-selected="handleMatchSelected"
+      @search-again="startNewSearch"
+      @show-next-matches="showPaginationWarning = true"
+    />
+    
+    <!-- Modal d'avertissement pour la pagination -->
+    <PaginationWarningModal 
+      :show="showPaginationWarning"
+      :remaining-matches="getRemainingMatches()"
+      :total-matches="allMatches.length"
+      @cancel="showPaginationWarning = false"
+      @confirm="confirmShowNextMatches"
     />
 
     <div class="py-6">
@@ -166,8 +178,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import UpdatePreferencesForm from './Partials/UpdatePreferencesForm.vue';
-import MatchModal from '@/Components/EatMe/MatchModal.vue';
+import TopMatchesModal from '@/Components/EatMe/TopMatchesModal.vue';
+import PaginationWarningModal from '@/Components/EatMe/PaginationWarningModal.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Button from '@/Components/EatMe/Button.vue';
 import Switch from '@/Components/EatMe/Switch.vue';
@@ -192,19 +206,23 @@ const searchCircle = ref(null);
 const nearbyUsersMarkers = ref([]);
 const showMatchModal = ref(false);
 const potentialMatches = ref([]);
+const totalMatchesFound = ref(0);
+const allMatches = ref([]);
+const currentMatchPage = ref(0);
+const showPaginationWarning = ref(false);
 
 // Critères de recherche
 const searchCriteria = ref({
-  activity: 'eat',
+  activity: 'dinner',
   profile: 'any',
   distance: 5
 });
 
 // Options pour les activités
 const activities = [
-  { value: 'eat', label: 'Manger' },
-  { value: 'drink', label: 'Boire un verre' },
-  { value: 'chat', label: 'Se changer les idées' }
+  { value: 'dinner', label: 'Manger' },
+  { value: 'coffee', label: 'Boire un verre' },
+  { value: 'lunch', label: 'Se changer les idées' }
 ];
 
 // Options pour les profils
@@ -230,42 +248,74 @@ const startSearch = () => {
   isSearching.value = true;
   clearNearbyUsersMarkers(); // Effacer les marqueurs existants
 
-  // Appel à l'API de recherche active
-  router.post(route('active-search.search'), {
+  // Utiliser axios avec la configuration correcte
+  // Utiliser la route web standard (approche Breeze)
+  axios.post('/matches/search', {
     latitude: userPosition.value.lat,
     longitude: userPosition.value.lng,
     distance: searchCriteria.value.distance,
     activity: searchCriteria.value.activity,
     profile: searchCriteria.value.profile
   }, {
-    preserveState: true,
-    onSuccess: (response) => {
-      // Ajouter les utilisateurs trouvés sur la carte
-      const nearbyUsers = response.props.data;
+    // S'assurer que les cookies sont envoyés avec la requête
+    withCredentials: true,
+    headers: {
+      // Récupérer le token CSRF du meta tag
+      'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(response => {
+    // Avec axios, la réponse est déjà parsée en JSON dans response.data
+    const data = response.data;
+    
+    console.log('Réponse de recherche:', data);
+    
+    // Stocker le nombre total de matchs trouvés
+    totalMatchesFound.value = data.total_matches_found || 0;
+    
+    // Stocker tous les matchs pour la pagination
+    allMatches.value = data.all_matches || [];
+    
+    // Réinitialiser la pagination
+    currentMatchPage.value = 0;
+    
+    // Récupérer les top 2 matchs pour l'affichage initial
+    const topMatches = data.data || [];
+    
+    if (topMatches.length > 0) {
+      // Ajouter les utilisateurs sur la carte
+      addNearbyUsersToMap(topMatches);
       
-      if (nearbyUsers && nearbyUsers.length > 0) {
-        addNearbyUsersToMap(nearbyUsers);
-        
-        // Récupérer les matchs potentiels depuis la réponse
-        if (response.props.potentialMatches && response.props.potentialMatches.length > 0) {
-          potentialMatches.value = response.props.potentialMatches;
-          // Afficher automatiquement le modal des matchs potentiels
-          showMatchModal.value = true;
-        }
-      } else {
-        alert('Aucun utilisateur correspondant à vos critères n\'a été trouvé à proximité.');
-      }
+      // Stocker les matchs pour le modal festif
+      potentialMatches.value = topMatches;
       
-      // Terminer la recherche avec un délai pour le fade out de l'animation
+      // Terminer la recherche d'abord
       setTimeout(() => {
         isSearching.value = false;
+        // Puis afficher le modal festif avec un petit délai pour l'effet
+        setTimeout(() => {
+          showMatchModal.value = true;
+        }, 500);
       }, 1000);
-    },
-    onError: (errors) => {
-      console.error('Erreur lors de la recherche:', errors);
-      alert('Une erreur est survenue lors de la recherche. Veuillez réessayer.');
-      isSearching.value = false;
+    } else {
+      // Aucun match trouvé
+      setTimeout(() => {
+        isSearching.value = false;
+        if (totalMatchesFound.value > 0) {
+          alert(`${totalMatchesFound.value} personnes compatibles trouvées, mais aucune ne correspond parfaitement à vos critères. Essayez d'élargir vos préférences !`);
+        } else {
+          alert('Aucun utilisateur correspondant à vos critères n\'a été trouvé à proximité.');
+        }
+      }, 1000);
     }
+  })
+  .catch(error => {
+    console.error('Erreur lors de la recherche:', error);
+    alert('Une erreur est survenue lors de la recherche. Veuillez réessayer.');
+    isSearching.value = false;
   });
 };
 
@@ -281,27 +331,72 @@ const closeMatchModal = () => {
   showMatchModal.value = false;
 };
 
-// Fonction pour gérer l'acceptation d'un match
-const handleMatchAccepted = (match) => {
-  // Retirer le match accepté de la liste
-  potentialMatches.value = potentialMatches.value.filter(m => m.id !== match.id);
+// Fonction pour gérer la sélection d'un match (nouveau)
+const handleMatchSelected = (match) => {
+  console.log('Match sélectionné:', match);
   
-  // Afficher un message de confirmation
-  alert(`Vous avez accepté le match avec ${match.name}. Vous pouvez maintenant communiquer avec cette personne.`);
+  // Fermer le modal
+  closeMatchModal();
   
-  // Fermer le modal si plus aucun match potentiel
-  if (potentialMatches.value.length === 0) {
-    closeMatchModal();
-  }
+  // Afficher un message de confirmation festif
+  setTimeout(() => {
+    alert(`🎉 Excellent choix ! Vous avez sélectionné ${match.user.name} avec un score de compatibilité de ${Math.round(match.compatibility_score)}% ! Nous allons vous mettre en contact.`);
+  }, 300);
+  
+  // Ici on pourrait ajouter la logique pour initier le contact
+  // Par exemple: router.visit(`/matches/${match.user.id}/chat`)
 };
 
-// Fonction pour gérer le rejet d'un match
-const handleMatchRejected = (match) => {
-  // Retirer le match rejeté de la liste
-  potentialMatches.value = potentialMatches.value.filter(m => m.id !== match.id);
+// Fonction pour démarrer une nouvelle recherche
+const startNewSearch = () => {
+  console.log('Nouvelle recherche demandée');
+  closeMatchModal();
   
-  // Fermer le modal si plus aucun match potentiel
-  if (potentialMatches.value.length === 0) {
+  // Réinitialiser toutes les données
+  potentialMatches.value = [];
+  totalMatchesFound.value = 0;
+  allMatches.value = [];
+  currentMatchPage.value = 0;
+  showPaginationWarning.value = false;
+  
+  // Relancer la recherche après un petit délai
+  setTimeout(() => {
+    startSearch();
+  }, 500);
+};
+
+// Fonction pour calculer les matchs restants
+const getRemainingMatches = () => {
+  const totalPages = Math.ceil(allMatches.value.length / 2);
+  return Math.max(0, allMatches.value.length - ((currentMatchPage.value + 1) * 2));
+};
+
+// Fonction pour confirmer l'affichage des matchs suivants
+const confirmShowNextMatches = () => {
+  showPaginationWarning.value = false;
+  
+  // Passer à la page suivante
+  currentMatchPage.value += 1;
+  
+  // Calculer les indices pour les 2 matchs suivants
+  const startIndex = currentMatchPage.value * 2;
+  const endIndex = startIndex + 2;
+  
+  // Récupérer les 2 matchs suivants
+  const nextMatches = allMatches.value.slice(startIndex, endIndex);
+  
+  if (nextMatches.length > 0) {
+    // Mettre à jour les matchs affichés
+    potentialMatches.value = nextMatches;
+    
+    // Mettre à jour la carte avec les nouveaux matchs
+    clearNearbyUsersMarkers();
+    addNearbyUsersToMap(nextMatches);
+    
+    console.log(`Affichage des matchs ${startIndex + 1}-${startIndex + nextMatches.length} sur ${allMatches.value.length}`);
+  } else {
+    // Plus de matchs disponibles
+    alert('Aucun match supplémentaire disponible.');
     closeMatchModal();
   }
 };
